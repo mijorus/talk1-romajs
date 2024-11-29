@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <h1>MIDI DEMO</h1>
+    <h2 style="color: green" class="access-status"></h2>
+    <ul class="ports"></ul>
+    <hr>
+    <b>
+        <p style="font-size: 50px;" class="signal"></p>
+    </b>
+    <div style="display: flex; gap: 10px;">
+        <div style="width: 50px; height: 50px; background-color: white;" class="indicator"></div>
+        <div style="width: 50px; height: 50px; background-color: white;" class="first-beat"></div>
+        <span style="font-size: 40px;" class="bpm">BPM 0</span>
+    </div>
+    <p class="beats" style="font-size: 40px;"></p>
+    <script>
+        window.addEventListener('DOMContentLoaded', initMIDIAccess)
+
+        let pulses = 0
+        let beats = 1
+        let isStopped = true
+        let beatIndicator = document.querySelector('.beats')
+        let signalContent = document.querySelector('.signal')
+        let signalIndicator = document.querySelector('.indicator')
+        let signalIndicatorFb = document.querySelector('.first-beat')
+        let bpmIndicator = document.querySelector('.bpm')
+        let lastPulse = 0
+
+
+        function showPulseIndicator() {
+            signalIndicator.style.backgroundColor = 'red'
+
+            setTimeout(() => {
+                signalIndicator.style.backgroundColor = 'white'
+            }, 100)
+        }
+
+        function showIndicatorFirstBeat() {
+            signalIndicatorFb.style.backgroundColor = 'lightgreen'
+
+            setTimeout(() => {
+                signalIndicatorFb.style.backgroundColor = 'white'
+            }, 100)
+        }
+
+        // MIDI Event Logger
+        async function initMIDIAccess() {
+            try {
+                // Request MIDI access
+                const midiAccess = await navigator.requestMIDIAccess();
+
+                // Log success message
+                console.log('MIDI Access Granted');
+                document.querySelector('.access-status').textContent = 'Access granted'
+
+
+                // Iterate through all inputs and add event listeners
+                midiAccess.inputs.forEach((input) => {
+                    console.log(`Listening to MIDI input: ${input.name}`);
+                    const li = document.createElement('li')
+                    li.textContent = input.name + ' input'
+                    document.querySelector('.ports').append(li)
+
+                    // Add event listener for MIDI messages
+                    input.addEventListener('midimessage', (e) => {
+                        // console.log(e.data)
+                        signalContent.textContent = JSON.stringify(Array.from(e.data)) + ' from: ' + e.currentTarget.name + ' input'
+
+                        // pulse
+                        if (e.data[0] === 248) {
+
+                            pulses = pulses + 1
+
+                            if (pulses % (24) === 0) {
+                                showPulseIndicator()
+
+                                if (!isStopped) {
+                                    beats = beats === 4 ? 1 : (beats + 1)
+
+                                    if (beats === 1) {
+                                        showIndicatorFirstBeat()
+                                    }
+
+                                    if (!lastPulse) {
+                                        lastPulse = performance.now()
+                                    } else {
+                                        const now = performance.now()
+                                        const bpm = (60 * 1000) / (now - lastPulse)
+                                        bpmIndicator.textContent = 'BPM ' + bpm.toFixed(4)
+                                        lastPulse = now
+                                    }
+
+
+                                    beatIndicator.textContent = 'Beat ' + beats
+                                }
+                            }
+                        }
+
+                        // stop
+                        if (e.data[0] === 252) {
+                            isStopped = true
+                        }
+
+                        // start or continue
+                        if (e.data[0] === 250 || e.data[0] === 251) {
+                            isStopped = false
+                        }
+
+                        // start
+                        if (e.data[0] === 250) {
+                            beats = 1
+                            pulses = 0
+                        }
+                    });
+                });
+
+                // Iterate through all outputs and add event listeners
+                midiAccess.outputs.forEach((output) => {
+                    console.log(`Listening to MIDI output: ${output.name}`);
+
+                    const li = document.createElement('li')
+                    li.textContent = output.name + ' output'
+                    document.querySelector('.ports').append(li)
+
+                    // Add event listener for MIDI messages
+                    output.addEventListener('midimessage', (e) => {
+                        // console.log(e.data)
+                        signalContent.textContent = JSON.stringify(Array.from(e.data))
+                    });
+                });
+
+                // Handle connection/disconnection of MIDI devices
+                midiAccess.addEventListener('statechange', (event) => {
+                    console.log('MIDI Device State Change:', event);
+                });
+
+            } catch (error) {
+                console.error('Error accessing MIDI devices:', error);
+            }
+        }
+    </script>
+</body>
+
+</html>
