@@ -17,8 +17,8 @@
     <div style="margin-top: 20px;"></div>
 
     <div>
-        <p id="volume"></p>
-        <p id="lpf"></p>
+        <p id="volume" class="big"></p>
+        <p id="lpf" class="big"></p>
     </div>
     <div>
         <img class="wave-img" id="wave-sawtooth" src="/demo-web-audio-2/assets/sawtooth.png" alt="">
@@ -152,7 +152,7 @@
             function setLpf(value) {
                 if (lpfNode) {
                     lpfFreq = 100 + (900 * (value / 127));
-                    // lpfNode.gain.value = vol;
+                    lpfNode.frequency.value = lpfFreq;
                     lpfLabel.textContent = 'LPF: ' + (lpfFreq).toFixed(2) + 'Hz';
                 }
             }
@@ -252,6 +252,10 @@
 
         #start-btn {
             font-size: 40px;
+        }
+
+        .big {
+            font-size: 20px;
         }
     </style>
 </body>
