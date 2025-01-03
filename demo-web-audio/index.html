@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <h1>Web Audio DEMO</h1>
+    <button id="start-btn">Start</button>
+    <button id="stop-btn">Stop</button>
+    <h2 id="info"></h2>
+    <script>
+        let audioCtx;
+        const infoText = document.querySelector('#info');
+        let notesQueue = [];
+
+        function createSound(audioCtx, frequency = 440) {
+            const osc = new OscillatorNode(audioCtx, { frequency, type: "sine" });
+            osc.connect(audioCtx.destination);
+            return osc;
+        }
+
+        function displayCurrentNote() {
+            if (audioCtx) {
+                const time = audioCtx.currentTime;
+                for (let note of notesQueue) {
+                    if (time >= note.startSound && time <= note.endSound) {
+                        infoText.textContent = 'Frequency ' + note.frequency + 'Hz';
+                    }
+                }
+            }
+
+            requestAnimationFrame(displayCurrentNote);
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            audioCtx = new AudioContext();
+            const startTime = audioCtx.currentTime;
+            for (let i = 0; i < 10; i++) {
+                const frequency = 440 + (i * 10);
+                const startSound = startTime + i;
+                const endSound = startSound + 0.5;
+                notesQueue.push({ frequency, startSound, endSound });
+
+                const osc = createSound(audioCtx, frequency);
+                osc.start(startSound);
+                osc.stop(endSound);
+            }
+        });
+
+        document.getElementById('stop-btn').addEventListener('click', () => {
+            audioCtx.close();
+        });
+
+
+        displayCurrentNote()
+    </script>
+</body>
+
+</html>

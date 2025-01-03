@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Audio + MIDI DEMO</title>
+</head>
+
+<body>
+    <h1>Web Audio + MIDI DEMO</h1>
+    <h2 style="color: green" class="access-status"></h2>
+    <ul class="ports"></ul>
+    <hr>
+    <button id="start-btn">▶️ Start</button>
+
+    <div style="margin-top: 20px;"></div>
+
+    <div>
+        <p id="volume"></p>
+        <p id="lpf"></p>
+    </div>
+    <div>
+        <img class="wave-img" id="wave-sawtooth" src="/demo-web-audio-2/assets/sawtooth.png" alt="">
+        <img class="wave-img" id="wave-sine" src="/demo-web-audio-2/assets/sine.png" alt="">
+        <img class="wave-img" id="wave-square" src="/demo-web-audio-2/assets/square.png" alt="">
+        <img class="wave-img" id="wave-triangle" src="/demo-web-audio-2/assets/triangle.png" alt="">
+    </div>
+
+    <div style="margin-top: 20px;"></div>
+
+    <div id="piano">
+        <svg xml:space="preserve" data-google-analytics-opt-out="">
+            <rect class="notekey c" style="fill:white;stroke:black" x="0" y="0" width="23" height="120" />
+            <rect class="notekey d" style="fill:white;stroke:black" x="23" y="0" width="23" height="120" />
+            <rect class="notekey e" style="fill:white;stroke:black" x="46" y="0" width="23" height="120" />
+            <rect class="notekey f" style="fill:white;stroke:black" x="69" y="0" width="23" height="120" />
+            <rect class="notekey g" style="fill:white;stroke:black" x="92" y="0" width="23" height="120" />
+            <rect class="notekey a" style="fill:white;stroke:black" x="115" y="0" width="23" height="120" />
+            <rect class="notekey b" style="fill:white;stroke:black" x="138" y="0" width="23" height="120" />
+            <!--  Black keys (overlap with the white keys)  -->
+            <rect class="notekey db" style="fill:black;stroke:black" x="14.33333" y="0" width="13" height="80" />
+            <rect class="notekey eb" style="fill:black;stroke:black" x="41.66666" y="0" width="13" height="80" />
+            <rect class="notekey gb" style="fill:black;stroke:black" x="82.25" y="0" width="13" height="80" />
+            <rect class="notekey ab" style="fill:black;stroke:black" x="108.25" y="0" width="13" height="80" />
+            <rect class="notekey bb" style="fill:black;stroke:black" x="134.75" y="0" width="13" height="80" />
+        </svg>
+    </div>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const waveImgs = document.querySelectorAll(`.wave-img`);
+            const startBtn = document.getElementById('start-btn');
+            const volumeLabel = document.getElementById('volume');
+            const lpfLabel = document.getElementById('lpf');
+            const piano = document;
+            let activeWave = 'square';
+            let lpfFreq = 400;
+            let notesOscillators = {};
+
+            let audioCtx;
+            let gainNode;
+            let lpfNode;;
+
+
+            // Let's create an audio context after the first user interaction, 
+            // and create a gain node that we will use to set the volume
+            startBtn.addEventListener('click', (e) => {
+                if (!audioCtx) {
+                    audioCtx = new AudioContext();
+
+                    lpfNode = new BiquadFilterNode(audioCtx, { type: "lowpass", frequency: lpfFreq });
+                    gainNode = new GainNode(audioCtx);
+
+                    // lpfNode -> gainNode -> output
+                    lpfNode.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    e.target.textContent = '✅ Started';
+                }
+            });
+
+            // Convert MIDI note number to frequency
+            function midiNoteToFrequency(note) {
+                // A4 (note 69) is 440Hz
+                return 440 * Math.pow(2, (note - 69) / 12);
+            }
+
+            function midiNoteToNoteName(midiNote) {
+                const noteNames = ['c', 'db', 'd', 'eb', 'e', 'f', 'gb', 'g', 'ab', 'a', 'bb', 'b'];
+                const octave = Math.floor(midiNote / 12) - 1;
+                const noteIndex = midiNote % 12;
+                return noteNames[noteIndex];
+            }
+
+            function setActiveWave(waveType) {
+                activeWave = waveType;
+
+                for (let osc in notesOscillators) {
+                    if (notesOscillators[osc].oscillator) {
+                        notesOscillators[osc].oscillator.type = waveType;
+                    }
+                }
+
+                waveImgs.forEach(el => {
+                    el.classList.remove('selected');
+
+                    if (el.getAttribute('id') === `wave-${activeWave}`) {
+                        el.classList.add('selected');
+                    }
+                });
+            }
+
+            function playNote(midiNote) {
+                const frequency = midiNoteToFrequency(midiNote);
+                const osc = new OscillatorNode(audioCtx, {
+                    frequency,
+                    type: activeWave,
+                });
+
+                // connect the oscillator to the audio node
+                // oscillatorNode -> lpfNode -> gainNode -> output
+                osc.connect(lpfNode);
+                osc.start();
+
+                notesOscillators[midiNote] = { oscillator: osc };
+
+                const noteName = midiNoteToNoteName(midiNote);
+                piano.querySelectorAll(`.${noteName}.notekey`).forEach(el => el.classList.remove('activenote'));
+                piano.querySelector(`.${noteName}.notekey`).classList.add('activenote');
+            }
+
+            function stopNote(midiNote) {
+                if (notesOscillators[midiNote]) {
+                    const { oscillator } = notesOscillators[midiNote];
+                    oscillator.stop();
+                    oscillator.disconnect();
+                    delete notesOscillators[midiNote];
+
+                    const noteName = midiNoteToNoteName(midiNote);
+                    piano.querySelector(`.${noteName}.notekey`).classList.remove('activenote');
+                }
+            }
+
+            function setGain(value) {
+                if (gainNode) {
+                    const vol = value / 127;
+                    gainNode.gain.value = vol;
+                    volumeLabel.textContent = 'Volume: ' + (vol * 100).toFixed(2) + '%';
+                }
+            }
+
+            function setLpf(value) {
+                if (lpfNode) {
+                    lpfFreq = 100 + (900 * (value / 127));
+                    // lpfNode.gain.value = vol;
+                    lpfLabel.textContent = 'LPF: ' + (lpfFreq).toFixed(2) + 'Hz';
+                }
+            }
+
+            // MIDI Event Logger
+            async function initMIDIAccess() {
+                setActiveWave('square');
+
+                try {
+                    // Request MIDI access
+                    const midiAccess = await navigator.requestMIDIAccess();
+
+                    // Log success message
+                    console.log('MIDI Access Granted');
+                    document.querySelector('.access-status').textContent = 'Access granted';
+
+
+                    // Iterate through all inputs and add event listeners
+                    midiAccess.inputs.forEach((input) => {
+                        console.log(`Listening to MIDI input: ${input.name}`);
+
+                        const li = document.createElement('li');
+                        li.textContent = input.name + ' input';
+                        document.querySelector('.ports').append(li);
+
+                        // Add event listener for MIDI messages
+                        input.addEventListener('midimessage', (e) => {
+                            const [command, note, velocity] = e.data;
+                            console.log(command, note, velocity);
+
+                            if (command === 185 && velocity) {
+                                if (note === 109) {
+                                    setActiveWave('sawtooth');
+                                }
+
+                                if (note === 111) {
+                                    setActiveWave('sine');
+                                }
+
+                                if (note === 113) {
+                                    setActiveWave('square');
+                                }
+
+                                if (note === 115) {
+                                    setActiveWave('triangle');
+                                }
+                            } else if (command === 176 && note === 82) {
+                                setGain(velocity);
+                            } else if (command === 176 && note === 74) {
+                                setLpf(velocity);
+                            } else {
+                                if (!audioCtx) {
+                                    return;
+                                }
+
+                                if (command >= 144 && command <= 159 && velocity) {
+                                    playNote(note);
+                                }
+
+                                if (command >= 128 && command <= 143) {
+                                    stopNote(note);
+                                }
+
+                                if (command >= 128 && command <= 143) {
+                                    stopNote(note);
+                                }
+                            }
+                        });
+                    });
+                } catch (error) {
+                    console.error('Error accessing MIDI devices:', error);
+                }
+            }
+
+            initMIDIAccess();
+        });
+    </script>
+
+    <style>
+        .wave-img {
+            width: 100px;
+            margin: 10px;
+        }
+
+        .wave-img.selected {
+            border: 5px solid green;
+        }
+
+        #piano {
+            transform: scale(3);
+            transform-origin: top left;
+        }
+
+        #piano .activenote {
+            fill: #7cfc00 !important;
+        }
+
+        #start-btn {
+            font-size: 40px;
+        }
+    </style>
+</body>
+
+</html>
