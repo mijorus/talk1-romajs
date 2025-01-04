@@ -19,6 +19,7 @@
     <div>
         <p id="volume" class="big"></p>
         <p id="lpf" class="big"></p>
+        <p id="hpf" class="big"></p>
     </div>
     <div>
         <img class="wave-img" id="wave-sawtooth" src="/demo-web-audio-2/assets/sawtooth.png" alt="">
@@ -53,14 +54,17 @@
             const startBtn = document.getElementById('start-btn');
             const volumeLabel = document.getElementById('volume');
             const lpfLabel = document.getElementById('lpf');
+            const hpfLabel = document.getElementById('hpf');
             const piano = document;
             let activeWave = 'square';
-            let lpfFreq = 400;
+            let lpfFreq = 10_000;
+            let hpfFreq = 1000;
             let notesOscillators = {};
 
             let audioCtx;
             let gainNode;
-            let lpfNode;;
+            let lpfNode;
+            let hpfNode;
 
 
             // Let's create an audio context after the first user interaction, 
@@ -70,10 +74,12 @@
                     audioCtx = new AudioContext();
 
                     lpfNode = new BiquadFilterNode(audioCtx, { type: "lowpass", frequency: lpfFreq });
+                    hpfNode = new BiquadFilterNode(audioCtx, { type: "highpass", frequency: hpfFreq });
                     gainNode = new GainNode(audioCtx);
 
                     // lpfNode -> gainNode -> output
                     lpfNode.connect(gainNode);
+                    hpfNode.connect(gainNode);
                     gainNode.connect(audioCtx.destination);
                     e.target.textContent = '✅ Started';
                 }
@@ -118,8 +124,9 @@
                 });
 
                 // connect the oscillator to the audio node
-                // oscillatorNode -> lpfNode -> gainNode -> output
+                // oscillatorNode -> lpfNode / hpfNode -> gainNode -> output
                 osc.connect(lpfNode);
+                osc.connect(hpfNode);
                 osc.start();
 
                 notesOscillators[midiNote] = { oscillator: osc };
@@ -151,9 +158,17 @@
 
             function setLpf(value) {
                 if (lpfNode) {
-                    lpfFreq = 100 + (900 * (value / 127));
+                    lpfFreq = 20 + (1900 * (value / 127));
                     lpfNode.frequency.value = lpfFreq;
                     lpfLabel.textContent = 'LPF: ' + (lpfFreq).toFixed(2) + 'Hz';
+                }
+            }
+
+            function setHpf(value) {
+                if (lpfNode) {
+                    hpfFreq = 20 + (2000 * (value / 127));
+                    hpfNode.frequency.value = hpfFreq;
+                    hpfLabel.textContent = 'HPF: ' + (hpfFreq).toFixed(2) + 'Hz';
                 }
             }
 
@@ -203,6 +218,8 @@
                                 setGain(velocity);
                             } else if (command === 176 && note === 74) {
                                 setLpf(velocity);
+                            } else if (command === 176 && note === 71) {
+                                setHpf(velocity);
                             } else {
                                 if (!audioCtx) {
                                     return;
@@ -255,7 +272,7 @@
         }
 
         .big {
-            font-size: 20px;
+            font-size: 30px;
         }
     </style>
 </body>
