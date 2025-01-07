@@ -48,6 +48,12 @@
         </svg>
     </div>
 
+    <div style="margin-top: 20px;"></div>
+
+    <div id="graph"></div>
+
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             const waveImgs = document.querySelectorAll(`.wave-img`);
@@ -65,6 +71,41 @@
             let gainNode;
             let lpfNode;
             let hpfNode;
+            let analyserNode;
+            let analyserArray;
+
+            const chart = Highcharts.chart('graph', {
+                title: {
+                    text: ''
+                },
+                chart: {
+                    animation: false,
+                    type: 'line',
+                },
+                xAxis: {
+                    showEmpty: true,
+                    visible: false,
+                },
+                yAxis: {
+                    showEmpty: true,
+                    max: 256,
+                    ceiling: 256,
+                },
+                legend: {
+                    enabled: false
+                },
+                series: [{
+                    name: 'Audio',
+                    color: 'red',
+                    data: analyserArray,
+                    step: 'left'
+                }],
+                plotOptions: {
+                    series: {
+                        step: 'left' // or 'center' or 'right'
+                    }
+                }
+            });
 
 
             // Let's create an audio context after the first user interaction, 
@@ -76,14 +117,36 @@
                     lpfNode = new BiquadFilterNode(audioCtx, { type: "lowpass", frequency: lpfFreq });
                     hpfNode = new BiquadFilterNode(audioCtx, { type: "highpass", frequency: hpfFreq });
                     gainNode = new GainNode(audioCtx);
+                    analyserNode = new AnalyserNode(audioCtx);
+
+                    analyserNode.fftSize = 2048;
+                    analyserArray = new Uint8Array(analyserNode.frequencyBinCount);
 
                     // lpfNode -> gainNode -> output
                     lpfNode.connect(gainNode);
                     hpfNode.connect(gainNode);
-                    gainNode.connect(audioCtx.destination);
+                    gainNode.connect(analyserNode);
+                    analyserNode.connect(audioCtx.destination);
                     e.target.textContent = '✅ Started';
                 }
             });
+
+            function drawFrequencyGraph() {
+                requestAnimationFrame(drawFrequencyGraph);
+
+                if (!analyserNode) {
+                    return;
+                }
+
+                const dataArr = [];
+                analyserNode.getByteFrequencyData(analyserArray);
+
+                for (let i = 0; i < analyserArray.length; i++) {
+                    dataArr.push([i, analyserArray[i]]);
+                }
+
+                chart.series[0].setData(dataArr);
+            }
 
             // Convert MIDI note number to frequency
             function midiNoteToFrequency(note) {
@@ -245,6 +308,7 @@
             }
 
             initMIDIAccess();
+            requestAnimationFrame(drawFrequencyGraph);
         });
     </script>
 
@@ -260,6 +324,7 @@
 
         #piano {
             transform: scale(3);
+            height: 400px;
             transform-origin: top left;
         }
 
