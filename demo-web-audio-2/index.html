@@ -19,7 +19,6 @@
     <div>
         <p id="volume" class="big"></p>
         <p id="lpf" class="big"></p>
-        <p id="hpf" class="big"></p>
     </div>
     <div>
         <img class="wave-img" id="wave-sawtooth" src="/demo-web-audio-2/assets/sawtooth.png" alt="">
@@ -53,8 +52,7 @@
             const waveImgs = document.querySelectorAll(`.wave-img`);
             const startBtn = document.getElementById('start-btn');
             const volumeLabel = document.getElementById('volume');
-            const lpfLabel = document.getElementById('lpf');
-            const hpfLabel = document.getElementById('hpf');
+            const filterLabel = document.getElementById('lpf');
             const piano = document;
             let activeWave = 'square';
             let lpfFreq = 10_000;
@@ -62,8 +60,11 @@
             let notesOscillators = {};
 
             let audioCtx;
+            /** @type {GainNode}*/
             let gainNode;
+            /** @type {BiquadFilterNode}*/
             let lpfNode;
+            /** @type {BiquadFilterNode}*/
             let hpfNode;
 
 
@@ -157,18 +158,24 @@
             }
 
             function setLpf(value) {
-                if (lpfNode) {
-                    lpfFreq = 20 + (1900 * (value / 127));
+                if (audioCtx) {
+                    lpfNode.connect(gainNode);
+                    hpfNode.disconnect();
+
+                    lpfFreq = 100 + (4900 * (value / 127));
                     lpfNode.frequency.value = lpfFreq;
-                    lpfLabel.textContent = 'LPF: ' + (lpfFreq).toFixed(2) + 'Hz';
+                    filterLabel.textContent = 'LPF: ' + (lpfFreq).toFixed(2) + 'Hz';
                 }
             }
 
             function setHpf(value) {
-                if (lpfNode) {
+                if (hpfNode) {
+                    hpfNode.connect(gainNode);
+                    lpfNode.disconnect();
+
                     hpfFreq = 20 + (2000 * (value / 127));
                     hpfNode.frequency.value = hpfFreq;
-                    hpfLabel.textContent = 'HPF: ' + (hpfFreq).toFixed(2) + 'Hz';
+                    filterLabel.textContent = 'HPF: ' + (hpfFreq).toFixed(2) + 'Hz';
                 }
             }
 
