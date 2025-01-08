@@ -63,6 +63,7 @@
             let activeWave = 'square';
             let lpfFreq = 10_000;
             let hpfFreq = 1000;
+            const sampleRate = 44_100;
             let notesOscillators = {};
 
             let audioCtx;
@@ -76,16 +77,17 @@
             let analyserArray;
 
             const chart = Highcharts.chart('graph', {
+                tooltip: { enabled: false },
                 title: {
                     text: ''
                 },
                 chart: {
                     animation: false,
-                    type: 'line',
+                    type: 'areaspline',
                 },
                 xAxis: {
                     showEmpty: true,
-                    visible: false,
+                    visible: true,
                 },
                 yAxis: {
                     showEmpty: true,
@@ -113,7 +115,7 @@
             // and create a gain node that we will use to set the volume
             startBtn.addEventListener('click', (e) => {
                 if (!audioCtx) {
-                    audioCtx = new AudioContext();
+                    audioCtx = new AudioContext({ sampleRate });
 
                     lpfNode = new BiquadFilterNode(audioCtx, { type: "lowpass", frequency: lpfFreq });
                     hpfNode = new BiquadFilterNode(audioCtx, { type: "highpass", frequency: hpfFreq });
@@ -132,21 +134,27 @@
                 }
             });
 
+            let frame = 0;
             function drawFrequencyGraph() {
+                frame = frame + 1;
+
+                if (frame === 3) {
+                    frame = 0;
+
+                    if (analyserNode) {
+                        const dataArr = [];
+                        analyserNode.getByteFrequencyData(analyserArray);
+
+                        for (let i = 0; i < analyserArray.length; i++) {
+                            dataArr.push([i * (sampleRate / 2 / analyserArray.length), analyserArray[i]]);
+                        }
+
+                        chart.series[0].setData(dataArr);
+                    }
+
+                }
+
                 requestAnimationFrame(drawFrequencyGraph);
-
-                if (!analyserNode) {
-                    return;
-                }
-
-                const dataArr = [];
-                analyserNode.getByteFrequencyData(analyserArray);
-
-                for (let i = 0; i < analyserArray.length; i++) {
-                    dataArr.push([i, analyserArray[i]]);
-                }
-
-                chart.series[0].setData(dataArr);
             }
 
             // Convert MIDI note number to frequency
@@ -236,7 +244,7 @@
                     hpfNode.connect(gainNode);
                     lpfNode.disconnect();
 
-                    hpfFreq = 20 + (2000 * (value / 127));
+                    hpfFreq = 500 + (6000 * (value / 127));
                     hpfNode.frequency.value = hpfFreq;
                     filterLabel.textContent = 'HPF: ' + (hpfFreq).toFixed(2) + 'Hz';
                 }
